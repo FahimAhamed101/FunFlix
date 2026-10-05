@@ -347,7 +347,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final rails = <Widget>[];
 
-    void add(String heading, List<CatalogTitle> titles, _RailKind kind) {
+    void add(
+      String heading,
+      List<CatalogTitle> titles,
+      _RailKind kind, {
+      VoidCallback? onMore,
+    }) {
       if (titles.isEmpty) return;
       rails.add(
         SliverToBoxAdapter(
@@ -356,6 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
             titles: titles,
             kind: kind,
             onTap: _open,
+            onMore: onMore,
           ),
         ),
       );
@@ -385,12 +391,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (wantSeries) {
       for (final shelf in buildShelves(widget.series).take(_kMaxSeriesRails)) {
-        add('TV Shows · ${shelf.name}', shelf.titles, _RailKind.poster);
+        add(
+          'TV Shows · ${shelf.name}',
+          shelf.titles,
+          _RailKind.poster,
+          onMore: () => _selectShelf(shelf.name),
+        );
       }
     }
     if (wantMovies) {
       for (final shelf in buildShelves(widget.movies).take(_kMaxMovieRails)) {
-        add(shelf.name, shelf.titles, _RailKind.poster);
+        add(
+          shelf.name,
+          shelf.titles,
+          _RailKind.poster,
+          onMore: () => _selectShelf(shelf.name),
+        );
       }
     }
 
@@ -413,12 +429,14 @@ class _Rail extends StatelessWidget {
     required this.titles,
     required this.kind,
     required this.onTap,
+    this.onMore,
   });
 
   final String heading;
   final List<CatalogTitle> titles;
   final _RailKind kind;
   final void Function(CatalogTitle title, {String? heroTag}) onTap;
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -435,7 +453,11 @@ class _Rail extends StatelessWidget {
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: NSectionHeader(title: heading),
+            child: NSectionHeader(
+              title: heading,
+              actionLabel: onMore != null ? 'See all' : null,
+              onAction: onMore,
+            ),
           ),
           const SizedBox(height: 10),
           SizedBox(

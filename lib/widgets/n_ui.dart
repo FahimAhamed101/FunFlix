@@ -388,43 +388,67 @@ class NSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final hasAction = onAction != null;
+
+    final header = Row(
       children: <Widget>[
         Expanded(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTheme.sectionTitle,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.sectionTitle,
+                ),
+              ),
+              if (hasAction) ...<Widget>[
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: AppColors.accent,
+                ),
+              ],
+            ],
           ),
         ),
-        if (actionLabel != null && onAction != null)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onAction,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-              child: Row(
-                children: <Widget>[
-                  Text(
-                    actionLabel!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: 19,
+        if (hasAction)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Row(
+              children: <Widget>[
+                Text(
+                  actionLabel ?? 'See all',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 19,
+                  color: AppColors.textSecondary,
+                ),
+              ],
             ),
           ),
       ],
     );
+
+    if (hasAction) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onAction,
+        child: header,
+      );
+    }
+
+    return header;
   }
 }
 
