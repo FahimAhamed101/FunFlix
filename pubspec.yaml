@@ -1,0 +1,29 @@
+name: movie_ui_demo
+description: A custom-UI movie browser built with Flutter.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  # Xtream-compatible API client. Only used by lib/data/xtream_movie_repository.dart;
+  # nothing in the UI depends on it.
+  xtream_code_client: ^2.0.1
+  # Playback. Handles HLS (.m3u8) and MP4 out of the box. If you hit raw
+  # MPEG-TS or MKV streams that this refuses to open, swap in media_kit, which
+  # wraps libmpv and plays more or less anything.
+  video_player: ^2.8.6
+  # Portal, username and password never touch SharedPreferences.
+  flutter_secure_storage: ^9.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
