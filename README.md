@@ -1,4 +1,4 @@
-# Reelhouse — custom-UI movie browser (Flutter)
+# FunFlix — custom-UI movie browser (Flutter)
 
 A small but complete example of a streaming-style movie UI in Flutter, with the
 catalogue behind a swappable data seam.
