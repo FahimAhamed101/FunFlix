@@ -305,4 +305,43 @@ void main() {
     expect(find.widgetWithText(NPrimaryButton, 'Sign In'), findsOneWidget);
     expect(find.text('Browse the sample catalogue'), findsOneWidget);
   });
+
+  testWidgets('selecting a category displays the category grid of titles',
+      (tester) async {
+    useTallSurface(tester);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: MainShell(
+          repository: MockMovieRepository(latency: Duration.zero),
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await settleAfterLoad(tester);
+
+    // Open the Categories sheet from the top bar
+    expect(find.text('Categories'), findsOneWidget);
+    await tester.tap(find.text('Categories'));
+    await tester.pumpAndSettle();
+
+    // The searchable category sheet should be open
+    expect(find.text('Select Category'), findsOneWidget);
+    expect(find.text('Sci-Fi'), findsOneWidget);
+
+    // Pick Sci-Fi
+    await tester.tap(find.text('Sci-Fi'));
+    await tester.pumpAndSettle();
+
+    // The category header should appear with title and count
+    expect(find.textContaining('titles available'), findsOneWidget);
+
+    // Going back to All restores the main home feed
+    await tester.tap(find.text('All').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Trending Now'), findsOneWidget);
+  });
 }
+

@@ -68,6 +68,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// When set, only this rail is shown. Chosen from the Categories sheet.
   String? _onlyShelf;
+  _CategorySort _categorySort = _CategorySort.defaultOrder;
+  _CategoryFilter _categorySubFilter = _CategoryFilter.all;
 
   @override
   void initState() {
@@ -93,6 +95,72 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<CatalogTitle> get _everything => <CatalogTitle>[...widget.movies, ...widget.series];
 
+  List<String> get _shelves {
+    final set = <String>{};
+    for (final m in widget.movies) {
+      final s = m.shelf.trim().isEmpty ? 'More to explore' : m.shelf.trim();
+      set.add(s);
+    }
+    for (final s in widget.series) {
+      final sh = s.shelf.trim().isEmpty ? 'More to explore' : s.shelf.trim();
+      set.add(sh);
+    }
+    final list = set.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
+  Map<String, int> get _shelfCounts {
+    final counts = <String, int>{};
+    for (final m in widget.movies) {
+      final s = m.shelf.trim().isEmpty ? 'More to explore' : m.shelf.trim();
+      counts[s] = (counts[s] ?? 0) + 1;
+    }
+    for (final s in widget.series) {
+      final sh = s.shelf.trim().isEmpty ? 'More to explore' : s.shelf.trim();
+      counts[sh] = (counts[sh] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  bool _matchesShelf(CatalogTitle title, String shelf) {
+    final s = title.shelf.trim().isEmpty ? 'More to explore' : title.shelf.trim();
+    return s.toLowerCase() == shelf.trim().toLowerCase();
+  }
+
+  List<CatalogTitle> _categoryTitles(String shelf) {
+    final movies = widget.movies.where((m) => _matchesShelf(m, shelf)).toList();
+    final series = widget.series.where((s) => _matchesShelf(s, shelf)).toList();
+
+    var list = switch (_categorySubFilter) {
+      _CategoryFilter.all => <CatalogTitle>[...movies, ...series],
+      _CategoryFilter.movies => movies,
+      _CategoryFilter.series => series,
+    };
+
+    switch (_categorySort) {
+      case _CategorySort.rating:
+        list.sort((a, b) => b.rating.compareTo(a.rating));
+      case _CategorySort.name:
+        list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      case _CategorySort.year:
+        list.sort((a, b) => b.year.compareTo(a.year));
+      case _CategorySort.defaultOrder:
+        break;
+    }
+    return list;
+  }
+
+  void _selectShelf(String? shelf) {
+    setState(() {
+      _onlyShelf = shelf;
+      _categorySubFilter = _CategoryFilter.all;
+    });
+    if (_scroll.hasClients) {
+      _scroll.jumpTo(0);
+    }
+  }
+
   void _open(CatalogTitle title, {String? heroTag}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -107,27 +175,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickCategory() async {
-    final shelves = <String>{
-      for (final shelf in buildShelves(widget.movies)) shelf.name,
-      for (final shelf in buildShelves(widget.series)) shelf.name,
-    }.toList()
-      ..sort();
-
     final picked = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => _CategorySheet(shelves: shelves, selected: _onlyShelf),
+      builder: (_) => _CategorySheet(
+        shelves: _shelves,
+        shelfCounts: _shelfCounts,
+        selected: _onlyShelf,
+        totalAllCount: widget.movies.length + widget.series.length,
+      ),
     );
 
     if (!mounted) return;
-    // A null result means the sheet was dismissed without choosing — which must
-    // not clear an existing filter.
     if (picked == null) return;
-    setState(() => _onlyShelf = picked == _kAllCategories ? null : picked);
+    _selectShelf(picked == _kAllCategories ? null : picked);
   }
 
   void _toggle(String key) {
@@ -144,6 +209,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!hasAnything) return _HomeError(onRetry: widget.onReload, detail: widget.error);
 
     final featured = trendingTitles(_everything, limit: 1).first;
+    final inCategoryMode = _onlyShelf != null;
+
+    final titles = inCategoryMode ? _categoryTitles(_onlyShelf!) : const <CatalogTitle>[];
+    final moviesInShelf = inCategoryMode
+        ? widget.movies.where((m) => _matchesShelf(m, _onlyShelf!)).length
+        : 0;
+    final seriesInShelf = inCategoryMode
+        ? widget.series.where((s) => _matchesShelf(s, _onlyShelf!)).length
+        : 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -157,18 +231,76 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _scroll,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: <Widget>[
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: 470,
-                    child: HeroBanner(
-                      title: featured,
-                      onPlay: () => _open(featured),
-                      onDetails: () => _open(featured),
+                if (!inCategoryMode) ...<Widget>[
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 470,
+                      child: HeroBanner(
+                        title: featured,
+                        onPlay: () => _open(featured),
+                        onDetails: () => _open(featured),
+                      ),
                     ),
                   ),
-                ),
-                ..._rails(),
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  ..._rails(),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                ] else ...<Widget>[
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).padding.top + 130,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _CategoryHeader(
+                      shelf: _onlyShelf!,
+                      totalCount: moviesInShelf + seriesInShelf,
+                      movieCount: moviesInShelf,
+                      seriesCount: seriesInShelf,
+                      subFilter: _categorySubFilter,
+                      onSubFilterChanged: (filter) =>
+                          setState(() => _categorySubFilter = filter),
+                      sort: _categorySort,
+                      onSortChanged: (sort) =>
+                          setState(() => _categorySort = sort),
+                      onBack: () => _selectShelf(null),
+                    ),
+                  ),
+                  if (titles.isEmpty)
+                    SliverToBoxAdapter(
+                      child: _CategoryEmptyView(
+                        shelf: _onlyShelf!,
+                        onReset: () => setState(() {
+                          _categorySubFilter = _CategoryFilter.all;
+                        }),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 14,
+                          mainAxisExtent: 200,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final title = titles[index];
+                            final tag = 'category-${_onlyShelf}-${title.id}';
+                            return TitleCard(
+                              title: title,
+                              width: null,
+                              heroTag: tag,
+                              onTap: () => _open(title, heroTag: tag),
+                            );
+                          },
+                          childCount: titles.length,
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -179,12 +311,15 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ValueListenableBuilder<double>(
               valueListenable: _barT,
               builder: (context, t, _) => _TopBar(
-                background: t,
+                background: inCategoryMode ? 1.0 : t,
                 active: _active,
                 onToggle: _toggle,
                 onCategories: _pickCategory,
                 onlyShelf: _onlyShelf,
-                onClearShelf: () => setState(() => _onlyShelf = null),
+                onClearShelf: () => _selectShelf(null),
+                onSelectShelf: (shelf) => _selectShelf(shelf),
+                shelves: _shelves,
+                shelfCounts: _shelfCounts,
                 demoMode: widget.demoMode,
                 onOpenProfile: widget.onOpenProfile,
                 onSearch: () => Navigator.of(context).push(
@@ -205,6 +340,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Widget> _rails() {
+    if (_onlyShelf != null) return const <Widget>[];
+
     final wantMovies = _active.isEmpty || _active.contains(_kMovies);
     final wantSeries = _active.isEmpty || _active.contains(_kSeries);
 
@@ -222,23 +359,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       );
-    }
-
-    // A chosen category replaces the whole feed rather than filtering it — the
-    // point of picking "4K UHD" is to see that shelf, not to see it plus
-    // twenty-five others.
-    if (_onlyShelf != null) {
-      add(
-        _onlyShelf!,
-        <CatalogTitle>[
-          if (wantMovies) ...widget.movies.where((m) => m.shelf == _onlyShelf),
-          if (wantSeries) ...widget.series.where((s) => s.shelf == _onlyShelf),
-        ],
-        _RailKind.poster,
-      );
-      return rails.isEmpty
-          ? <Widget>[const SliverToBoxAdapter(child: _NoResults())]
-          : rails;
     }
 
     final mixed = <CatalogTitle>[
@@ -370,6 +490,9 @@ class _TopBar extends StatelessWidget {
     required this.onCategories,
     required this.onlyShelf,
     required this.onClearShelf,
+    required this.onSelectShelf,
+    required this.shelves,
+    required this.shelfCounts,
     required this.demoMode,
     required this.onOpenProfile,
     required this.onSearch,
@@ -383,6 +506,9 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onCategories;
   final String? onlyShelf;
   final VoidCallback onClearShelf;
+  final ValueChanged<String> onSelectShelf;
+  final List<String> shelves;
+  final Map<String, int> shelfCounts;
   final bool demoMode;
   final VoidCallback? onOpenProfile;
   final VoidCallback onSearch;
@@ -391,9 +517,14 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        // Interpolated rather than faded with an opacity layer, so the bar
-        // never composites the feed underneath it.
-        color: Color.lerp(Colors.transparent, AppColors.background, background),
+        color: onlyShelf != null
+            ? AppColors.background
+            : Color.lerp(Colors.transparent, AppColors.background, background),
+        border: (onlyShelf != null || background > 0.6)
+            ? const Border(
+                bottom: BorderSide(color: AppColors.border, width: 0.5),
+              )
+            : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -454,43 +585,36 @@ class _TopBar extends StatelessWidget {
               ],
             ),
           ),
-          if (onlyShelf != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onClearShelf,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceHigh,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        onlyShelf!,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      const Icon(
-                        Icons.close_rounded,
-                        size: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 32,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: shelves.length + 1,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  final isSelected = onlyShelf == null;
+                  return _CategoryChip(
+                    label: 'All',
+                    selected: isSelected,
+                    onTap: onClearShelf,
+                  );
+                }
+                final shelf = shelves[index - 1];
+                final count = shelfCounts[shelf] ?? 0;
+                final isSelected = onlyShelf == shelf;
+                return _CategoryChip(
+                  label: shelf,
+                  count: count,
+                  selected: isSelected,
+                  onTap: () => onSelectShelf(shelf),
+                );
+              },
             ),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -567,76 +691,266 @@ class _SampleChip extends StatelessWidget {
   }
 }
 
-/// The category picker.
-class _CategorySheet extends StatelessWidget {
-  const _CategorySheet({required this.shelves, required this.selected});
+enum _CategorySort { defaultOrder, rating, year, name }
 
-  final List<String> shelves;
-  final String? selected;
+enum _CategoryFilter { all, movies, series }
+
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.count,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final int? count;
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const SizedBox(height: 10),
-          Container(
-            width: 34,
-            height: 3,
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accent : AppColors.surfaceHigh,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? AppColors.accent : AppColors.border,
+            width: 0.6,
           ),
-          const SizedBox(height: 14),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: <Widget>[
-                Text('Categories', style: AppTheme.sectionTitle),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          // Bounded explicitly instead of `Flexible` + `shrinkWrap`.
-          //
-          // A `Flexible` child holding a shrink-wrapped ListView inside a
-          // min-size Column gives the layout a circular constraint — the
-          // Column's height depends on the list, and the list's height depends
-          // on the Column. Flutter resolves that by looping forever, which
-          // hangs the UI thread hard enough that not even a timer fires.
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.55,
-            ),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: <Widget>[
-                _CategoryRow(
-                  label: 'All categories',
-                  selected: selected == null,
-                  onTap: () => Navigator.of(context).pop(_kAllCategories),
-                ),
-                for (final shelf in shelves)
-                  _CategoryRow(
-                    label: shelf,
-                    selected: selected == shelf,
-                    onTap: () => Navigator.of(context).pop(shelf),
+          boxShadow: selected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x66E50914),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
                   ),
-              ],
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? Colors.white : AppColors.textPrimary,
+              ),
             ),
+            if (count != null && count! > 0) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? const Color(0x40FFFFFF)
+                      : const Color(0x1FFFFFFF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryHeader extends StatelessWidget {
+  const _CategoryHeader({
+    required this.shelf,
+    required this.totalCount,
+    required this.movieCount,
+    required this.seriesCount,
+    required this.subFilter,
+    required this.onSubFilterChanged,
+    required this.sort,
+    required this.onSortChanged,
+    required this.onBack,
+  });
+
+  final String shelf;
+  final int totalCount;
+  final int movieCount;
+  final int seriesCount;
+  final _CategoryFilter subFilter;
+  final ValueChanged<_CategoryFilter> onSubFilterChanged;
+  final _CategorySort sort;
+  final ValueChanged<_CategorySort> onSortChanged;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final showTypeTabs = movieCount > 0 && seriesCount > 0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onBack,
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border, width: 0.5),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      shelf,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$totalCount titles available',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<_CategorySort>(
+                initialValue: sort,
+                onSelected: onSortChanged,
+                color: AppColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: const BorderSide(color: AppColors.border, width: 0.5),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border, width: 0.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      const Icon(
+                        Icons.sort_rounded,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        switch (sort) {
+                          _CategorySort.defaultOrder => 'Default',
+                          _CategorySort.rating => 'Rating',
+                          _CategorySort.year => 'Year',
+                          _CategorySort.name => 'A-Z',
+                        },
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_drop_down_rounded,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                    ],
+                  ),
+                ),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: _CategorySort.defaultOrder,
+                    child: Text('Default Order', style: TextStyle(fontSize: 13)),
+                  ),
+                  const PopupMenuItem(
+                    value: _CategorySort.rating,
+                    child: Text('Highest Rating ★', style: TextStyle(fontSize: 13)),
+                  ),
+                  const PopupMenuItem(
+                    value: _CategorySort.year,
+                    child: Text('Newest Release Year', style: TextStyle(fontSize: 13)),
+                  ),
+                  const PopupMenuItem(
+                    value: _CategorySort.name,
+                    child: Text('Title (A to Z)', style: TextStyle(fontSize: 13)),
+                  ),
+                ],
+              ),
+            ],
           ),
+          if (showTypeTabs) ...[
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: <Widget>[
+                  _SubFilterTab(
+                    label: 'All ($totalCount)',
+                    selected: subFilter == _CategoryFilter.all,
+                    onTap: () => onSubFilterChanged(_CategoryFilter.all),
+                  ),
+                  const SizedBox(width: 8),
+                  _SubFilterTab(
+                    label: 'Movies ($movieCount)',
+                    selected: subFilter == _CategoryFilter.movies,
+                    onTap: () => onSubFilterChanged(_CategoryFilter.movies),
+                  ),
+                  const SizedBox(width: 8),
+                  _SubFilterTab(
+                    label: 'TV Shows ($seriesCount)',
+                    selected: subFilter == _CategoryFilter.series,
+                    onTap: () => onSubFilterChanged(_CategoryFilter.series),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _CategoryRow extends StatelessWidget {
-  const _CategoryRow({
+class _SubFilterTab extends StatelessWidget {
+  const _SubFilterTab({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -651,11 +965,313 @@ class _CategoryRow extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : AppColors.surfaceHigh,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.black : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryEmptyView extends StatelessWidget {
+  const _CategoryEmptyView({
+    required this.shelf,
+    required this.onReset,
+  });
+
+  final String shelf;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: AppColors.surfaceHigh,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.filter_alt_off_rounded,
+              size: 36,
+              color: AppColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No titles match this filter in "$shelf"',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Try switching to All or resetting your filter.',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onReset,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Show all in this category',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The category picker sheet with live instant search and item counts.
+class _CategorySheet extends StatefulWidget {
+  const _CategorySheet({
+    required this.shelves,
+    required this.shelfCounts,
+    required this.selected,
+    required this.totalAllCount,
+  });
+
+  final List<String> shelves;
+  final Map<String, int> shelfCounts;
+  final String? selected;
+  final int totalAllCount;
+
+  @override
+  State<_CategorySheet> createState() => _CategorySheetState();
+}
+
+class _CategorySheetState extends State<_CategorySheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final needle = _query.trim().toLowerCase();
+    final filtered = needle.isEmpty
+        ? widget.shelves
+        : widget.shelves
+            .where((s) => s.toLowerCase().contains(needle))
+            .toList();
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const SizedBox(height: 10),
+            Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: <Widget>[
+                  const Icon(
+                    Icons.category_rounded,
+                    size: 20,
+                    color: AppColors.accent,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Select Category',
+                      style: AppTheme.sectionTitle,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${widget.shelves.length} categories',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) => setState(() => _query = val),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Search categories...',
+                  hintStyle: const TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0x66FFFFFF),
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppColors.surfaceHigh,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.58,
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                children: <Widget>[
+                  if (needle.isEmpty)
+                    _CategoryRow(
+                      label: 'All categories',
+                      count: widget.totalAllCount,
+                      selected: widget.selected == null,
+                      onTap: () => Navigator.of(context).pop(_kAllCategories),
+                    ),
+                  for (final shelf in filtered)
+                    _CategoryRow(
+                      label: shelf,
+                      count: widget.shelfCounts[shelf] ?? 0,
+                      selected: widget.selected == shelf,
+                      onTap: () => Navigator.of(context).pop(shelf),
+                    ),
+                  if (filtered.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 28),
+                      child: Center(
+                        child: Text(
+                          'No categories found',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryRow extends StatelessWidget {
+  const _CategoryRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.count,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final int? count;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
       child: Container(
         color: selected ? AppColors.surfaceHigh : Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(
           children: <Widget>[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: selected
+                    ? const Color(0x33E50914)
+                    : const Color(0x14FFFFFF),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                selected ? Icons.folder_open_rounded : Icons.folder_rounded,
+                size: 16,
+                color: selected ? AppColors.accent : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
@@ -664,44 +1280,29 @@ class _CategoryRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: AppColors.textPrimary,
+                  color: selected ? Colors.white : AppColors.textPrimary,
                 ),
               ),
             ),
+            if (count != null) ...[
+              Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             if (selected)
               const Icon(
-                Icons.check_rounded,
+                Icons.check_circle_rounded,
                 size: 18,
                 color: AppColors.accent,
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _NoResults extends StatelessWidget {
-  const _NoResults();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(24, 40, 24, 40),
-      child: Column(
-        children: <Widget>[
-          Icon(
-            Icons.filter_alt_off_outlined,
-            size: 34,
-            color: AppColors.textMuted,
-          ),
-          SizedBox(height: 12),
-          Text(
-            'Nothing in this category',
-            style: AppTheme.body,
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }
