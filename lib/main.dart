@@ -199,7 +199,7 @@ class _AppBootstrapState extends State<AppBootstrap> {
     // message that has to reach the user — "the saved account could not be
     // erased" — is raised *after* the shell has been torn down.
     return MaterialApp(
-      title: 'Reelhouse',
+      title: 'FunFlix',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
       scaffoldMessengerKey: _messenger,

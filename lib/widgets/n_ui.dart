@@ -7,24 +7,64 @@ import '../theme/app_theme.dart';
 /// Kept in one file so the visual language stays consistent: a screen should
 /// reach for these rather than re-deriving button padding or badge metrics.
 
-/// The wordmark. Netflix's logo is a heavy condensed red wordmark with very
-/// tight tracking — this reproduces the shape of it without the trademark.
+/// The wordmark. Netflix-style heavy condensed wordmark with tight tracking.
 class Wordmark extends StatelessWidget {
-  const Wordmark({super.key, this.size = 24});
+  const Wordmark({
+    super.key,
+    this.size = 24,
+    this.title = 'FUNFLIX',
+    this.showBadge = false,
+  });
 
   final double size;
+  final String title;
+  final bool showBadge;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      'REELHOUSE',
-      style: TextStyle(
-        fontSize: size,
-        fontWeight: FontWeight.w900,
-        letterSpacing: size * -0.055,
-        height: 1,
-        color: AppColors.accent,
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: size,
+            fontWeight: FontWeight.w900,
+            letterSpacing: size * -0.045,
+            height: 1,
+            color: AppColors.accent,
+          ),
+        ),
+        if (showBadge) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE50914), Color(0xFFB81D24)],
+              ),
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0x66E50914),
+                  blurRadius: 6,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: const Text(
+              'IPTV',
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -54,19 +94,35 @@ class NPrimaryButton extends StatelessWidget {
     return _Pressable(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
+        duration: const Duration(milliseconds: 140),
         height: 52,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: enabled ? AppColors.accent : const Color(0xFF3A3A3A),
-          borderRadius: BorderRadius.circular(4),
+          gradient: enabled
+              ? const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFC11119)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                )
+              : null,
+          color: enabled ? null : const Color(0xFF2C2C30),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: const Color(0x61E50914),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: busy
             ? const SizedBox(
-                width: 19,
-                height: 19,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth: 2.2,
                   color: Colors.white,
                 ),
               )
@@ -75,7 +131,7 @@ class NPrimaryButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   if (icon != null) ...<Widget>[
-                    Icon(icon, size: 22, color: Colors.white),
+                    Icon(icon, size: 21, color: Colors.white),
                     const SizedBox(width: 8),
                   ],
                   Text(
@@ -84,7 +140,8 @@ class NPrimaryButton extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
                       color: Colors.white,
                     ),
                   ),
