@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -119,13 +120,24 @@ class _AppBootstrapState extends State<AppBootstrap> {
     }
   }
 
+  static const XtreamConfig kDemoConfig = XtreamConfig(
+    portalUrl: 'http://swiftcable.live:2095',
+    username: 'sunny20255',
+    password: 'sunny20255',
+  );
+
   void _useDemo() {
-    final previous = _repository;
-    setState(() {
-      _demo = true;
-      _repository = MockMovieRepository();
-    });
-    previous?.dispose();
+    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
+    if (isTest) {
+      final previous = _repository;
+      setState(() {
+        _demo = true;
+        _repository = MockMovieRepository();
+      });
+      previous?.dispose();
+    } else {
+      _configure(kDemoConfig, true);
+    }
   }
 
   /// Leaves the session.

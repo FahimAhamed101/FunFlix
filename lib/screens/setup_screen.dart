@@ -50,6 +50,10 @@ class _SetupScreenState extends State<SetupScreen> {
   _TestState _test = _TestState.idle;
   String _testDetail = '';
 
+  static const String kDefaultDemoPortal = 'http://swiftcable.live:2095';
+  static const String kDefaultDemoUser = 'sunny20255';
+  static const String kDefaultDemoPass = 'sunny20255';
+
   @override
   void initState() {
     super.initState();
@@ -58,7 +62,21 @@ class _SetupScreenState extends State<SetupScreen> {
       _portal.text = initial.portalUrl;
       _username.text = initial.username;
       _password.text = initial.password;
+    } else {
+      _portal.text = kDefaultDemoPortal;
+      _username.text = kDefaultDemoUser;
+      _password.text = kDefaultDemoPass;
     }
+  }
+
+  void _useDemoCredentials() {
+    setState(() {
+      _portal.text = kDefaultDemoPortal;
+      _username.text = kDefaultDemoUser;
+      _password.text = kDefaultDemoPass;
+      _remember = true;
+    });
+    _connect();
   }
 
   @override
@@ -433,6 +451,12 @@ class _SetupScreenState extends State<SetupScreen> {
                     child: Row(
                       children: <Widget>[
                         _HelperChip(
+                          label: 'Demo Login',
+                          icon: Icons.bolt_rounded,
+                          onTap: _useDemoCredentials,
+                        ),
+                        const SizedBox(width: 6),
+                        _HelperChip(
                           label: 'http://',
                           onTap: () => _prependScheme('http://'),
                         ),
@@ -529,6 +553,84 @@ class _SetupScreenState extends State<SetupScreen> {
 
                   const SizedBox(height: 24),
 
+                  // Instant Demo Sign In Card
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0x33E50914), Color(0x14FFFFFF)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0x66E50914),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.flash_on_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'Swift Cable Demo',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'swiftcable.live:2095 • sunny20255',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: busy ? null : _useDemoCredentials,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Demo Sign In',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // Primary Sign In Button
                   NPrimaryButton(
                     label: 'Sign In',
@@ -610,6 +712,11 @@ class _SetupScreenState extends State<SetupScreen> {
                   _TextAction(
                     label: 'Browse the sample catalogue',
                     onTap: widget.onUseDemo,
+                  ),
+                  const SizedBox(height: 10),
+                  _TextAction(
+                    label: 'Sign in with demo account (swiftcable.live)',
+                    onTap: _useDemoCredentials,
                   ),
 
                   const SizedBox(height: 30),
