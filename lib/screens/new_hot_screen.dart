@@ -222,7 +222,7 @@ class _NewHotScreenState extends State<NewHotScreen> {
         crossAxisCount: 3,
         crossAxisSpacing: 8,
         mainAxisSpacing: 14,
-        mainAxisExtent: 180,
+        mainAxisExtent: 200,
       ),
       itemCount: titles.length,
       itemBuilder: (context, index) {

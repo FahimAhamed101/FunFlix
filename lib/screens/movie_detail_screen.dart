@@ -260,7 +260,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   crossAxisCount: 3,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 14,
-                  mainAxisExtent: 180,
+                  mainAxisExtent: 200,
                 ),
                 itemCount: similar.length,
                 itemBuilder: (context, index) {

@@ -129,35 +129,40 @@ class TitleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        AspectRatio(
-          aspectRatio: 2 / 3,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                _hero(
-                  PosterImage(
-                    url: title.posterUrl,
-                    seed: title.posterSeed,
-                    label: title.title,
-                    cacheWidth: width == null ? null : (width! * 2).round(),
-                  ),
-                ),
-                if (title.isSeries)
-                  const Positioned(
-                    left: 5,
-                    top: 5,
-                    child: _SeriesBadge(),
-                  ),
-              ],
+    final posterImage = ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          _hero(
+            PosterImage(
+              url: title.posterUrl,
+              seed: title.posterSeed,
+              label: title.title,
+              cacheWidth: width == null ? null : (width! * 2).round(),
             ),
           ),
-        ),
+          if (title.isSeries)
+            const Positioned(
+              left: 5,
+              top: 5,
+              child: _SeriesBadge(),
+            ),
+        ],
+      ),
+    );
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: width == null ? MainAxisSize.max : MainAxisSize.min,
+      children: <Widget>[
+        if (width == null)
+          Expanded(child: posterImage)
+        else
+          AspectRatio(
+            aspectRatio: 2 / 3,
+            child: posterImage,
+          ),
         const SizedBox(height: 6),
         Text(
           title.title,

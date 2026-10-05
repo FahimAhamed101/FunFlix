@@ -137,7 +137,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     crossAxisCount: 3,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 14,
-                    mainAxisExtent: 180,
+                    mainAxisExtent: 200,
                   ),
                   itemCount: results.length,
                   itemBuilder: (context, index) {
@@ -184,7 +184,7 @@ class _Suggestions extends StatelessWidget {
             crossAxisCount: 3,
             crossAxisSpacing: 8,
             mainAxisSpacing: 14,
-            mainAxisExtent: 180,
+            mainAxisExtent: 200,
           ),
           itemCount: titles.length,
           itemBuilder: (context, index) {
