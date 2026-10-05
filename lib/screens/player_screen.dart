@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
+import '../services/video_cache_manager.dart';
 import '../theme/app_theme.dart';
 
 enum VideoFitMode { contain, cover, sixteenNine }
@@ -18,6 +19,7 @@ enum VideoFitMode { contain, cover, sixteenNine }
 ///   * Aspect ratio modes (Fit, Zoom to Fill, 16:9)
 ///   * Playback speed selector (0.75x to 2.0x)
 ///   * Live TV latency and stream reconnect logic
+///   * Automatic video cache purging and decoder release on close
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
     super.key,
@@ -37,12 +39,13 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   VideoPlayerController? _controller;
   Object? _error;
   bool _initialising = true;
   bool _controlsVisible = true;
   bool _immersive = false;
+  bool _isClosing = false;
   VideoFitMode _fitMode = VideoFitMode.contain;
   double _speed = 1.0;
   Timer? _hideTimer;
@@ -60,17 +63,89 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _open();
   }
 
   @override
-  void dispose() {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When the app is minimized or the screen is turned off, immediately pause
+    // the video decoder so the device CPU and other applications run smoothly.
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _controller?.pause();
+    }
+  }
+
+  /// Synchronously halts playback, restores system UI, exits cleanly,
+  /// and purges player cache files and RAM in the background.
+  void _handleClose() {
+    if (_isClosing) return;
+    _isClosing = true;
+
+    // 1. Cancel timers to halt UI scheduling
     _hideTimer?.cancel();
     _leftSeekTimer?.cancel();
     _rightSeekTimer?.cancel();
-    _controller?.dispose();
+
+    // 2. Immediately stop audio & video playback
+    final controller = _controller;
+    _controller = null;
+    if (controller != null) {
+      try {
+        controller.removeListener(_onTick);
+        controller.pause();
+      } catch (_) {}
+    }
+
+    // 3. Restore system bars and orientation
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    SystemChrome.setPreferredOrientations(const <DeviceOrientation>[
+      DeviceOrientation.portraitUp,
+    ]);
+
+    // 4. Pop player route smoothly
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+
+    // 5. Clean up hardware decoder and delete temporary video cache files
+    unawaited(() async {
+      try {
+        await controller?.dispose();
+      } catch (_) {}
+      await VideoCacheManager.instance.clearPlayerCache();
+    }());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _hideTimer?.cancel();
+    _leftSeekTimer?.cancel();
+    _rightSeekTimer?.cancel();
+
+    final controller = _controller;
+    _controller = null;
+    if (controller != null) {
+      try {
+        controller.removeListener(_onTick);
+        controller.pause();
+      } catch (_) {}
+      unawaited(() async {
+        try {
+          await controller.dispose();
+        } catch (_) {}
+        await VideoCacheManager.instance.clearPlayerCache();
+      }());
+    } else if (!_isClosing) {
+      unawaited(VideoCacheManager.instance.clearPlayerCache());
+    }
+
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations(const <DeviceOrientation>[
+      DeviceOrientation.portraitUp,
+    ]);
     super.dispose();
   }
 
@@ -82,7 +157,14 @@ class _PlayerScreenState extends State<PlayerScreen>
 
     final previous = _controller;
     _controller = null;
-    await previous?.dispose();
+    if (previous != null) {
+      try {
+        previous.removeListener(_onTick);
+        await previous.pause();
+      } catch (_) {}
+      await previous.dispose();
+      unawaited(VideoCacheManager.instance.clearPlayerCache());
+    }
 
     // Standard desktop browser User-Agent ensures IPTV CDN / panel servers
     // do not rate-limit or throttle chunk downloading.
@@ -99,8 +181,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     try {
       await controller.initialize();
       await controller.play();
-      if (!mounted) {
+      if (!mounted || _isClosing) {
         await controller.dispose();
+        unawaited(VideoCacheManager.instance.clearPlayerCache());
         return;
       }
       controller.addListener(_onTick);
@@ -111,7 +194,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       _scheduleHide();
     } catch (error) {
       await controller.dispose();
-      if (!mounted) return;
+      unawaited(VideoCacheManager.instance.clearPlayerCache());
+      if (!mounted || _isClosing) return;
       setState(() {
         _error = error;
         _initialising = false;
@@ -120,18 +204,20 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   void _onTick() {
+    if (_isClosing) return;
     final controller = _controller;
     if (controller == null) return;
     if (controller.value.hasError && _error == null) {
       setState(() => _error = controller.value.errorDescription);
     }
-    if (mounted) setState(() {});
+    if (mounted && !_isClosing) setState(() {});
   }
 
   void _scheduleHide() {
     _hideTimer?.cancel();
+    if (_isClosing) return;
     _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && !_isScrubbing) {
+      if (mounted && !_isScrubbing && !_isClosing) {
         setState(() => _controlsVisible = false);
       }
     });
@@ -265,69 +351,77 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          // Video Canvas
-          Center(child: _buildStage()),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (didPop) return;
+        _handleClose();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            // Video Canvas
+            Center(child: _buildStage()),
 
-          // Gesture Detector for Double-Tap Seek & Controls Toggle
-          Positioned.fill(
-            child: Row(
-              children: <Widget>[
-                // Left 50% screen (Seek -10s on double tap)
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _toggleControls,
-                    onDoubleTap: () => _triggerDoubleTapSeek(false),
-                    child: Container(
-                      color: Colors.transparent,
-                      alignment: Alignment.center,
-                      child: _showLeftSeekRipple
-                          ? const _SeekRipple(seconds: -10, isForward: false)
-                          : null,
+            // Gesture Detector for Double-Tap Seek & Controls Toggle
+            Positioned.fill(
+              child: Row(
+                children: <Widget>[
+                  // Left 50% screen (Seek -10s on double tap)
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: _toggleControls,
+                      onDoubleTap: () => _triggerDoubleTapSeek(false),
+                      child: Container(
+                        color: Colors.transparent,
+                        alignment: Alignment.center,
+                        child: _showLeftSeekRipple
+                            ? const _SeekRipple(seconds: -10, isForward: false)
+                            : null,
+                      ),
                     ),
                   ),
-                ),
-                // Right 50% screen (Seek +10s on double tap)
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _toggleControls,
-                    onDoubleTap: () => _triggerDoubleTapSeek(true),
-                    child: Container(
-                      color: Colors.transparent,
-                      alignment: Alignment.center,
-                      child: _showRightSeekRipple
-                          ? const _SeekRipple(seconds: 10, isForward: true)
-                          : null,
+                  // Right 50% screen (Seek +10s on double tap)
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: _toggleControls,
+                      onDoubleTap: () => _triggerDoubleTapSeek(true),
+                      child: Container(
+                        color: Colors.transparent,
+                        alignment: Alignment.center,
+                        child: _showRightSeekRipple
+                            ? const _SeekRipple(seconds: 10, isForward: true)
+                            : null,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Buffering & Caching Indicator Overlay
-          if (_controller != null &&
-              _controller!.value.isBuffering &&
-              !_initialising &&
-              _error == null)
-            const Center(child: _BufferingGlowIndicator()),
+            // Buffering & Caching Indicator Overlay
+            if (_controller != null &&
+                _controller!.value.isBuffering &&
+                !_initialising &&
+                _error == null &&
+                !_isClosing)
+              const Center(child: _BufferingGlowIndicator()),
 
-          // Full Player Controls Overlay
-          AnimatedOpacity(
-            opacity: _controlsVisible ? 1 : 0,
-            duration: const Duration(milliseconds: 200),
-            child: IgnorePointer(
-              ignoring: !_controlsVisible,
-              child: _buildControls(),
+            // Full Player Controls Overlay
+            AnimatedOpacity(
+              opacity: (_controlsVisible && !_isClosing) ? 1 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: IgnorePointer(
+                ignoring: !_controlsVisible || _isClosing,
+                child: _buildControls(),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -397,19 +491,43 @@ class _PlayerScreenState extends State<PlayerScreen>
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _open,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Retry Playback'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                OutlinedButton.icon(
+                  onPressed: _handleClose,
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Go Back'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    side: const BorderSide(color: Colors.white24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: _open,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Retry Playback'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -470,7 +588,8 @@ class _PlayerScreenState extends State<PlayerScreen>
               child: Row(
                 children: <Widget>[
                   IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    tooltip: 'Back',
+                    onPressed: _handleClose,
                     icon: const Icon(
                       Icons.arrow_back_rounded,
                       color: Colors.white,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:movie_ui_demo/data/movie_repository.dart';
@@ -12,6 +13,7 @@ import 'package:movie_ui_demo/screens/live_tv_screen.dart';
 import 'package:movie_ui_demo/screens/main_shell.dart';
 import 'package:movie_ui_demo/screens/movie_detail_screen.dart';
 import 'package:movie_ui_demo/screens/my_netflix_screen.dart';
+import 'package:movie_ui_demo/services/video_cache_manager.dart';
 import 'package:movie_ui_demo/theme/app_theme.dart';
 import 'package:movie_ui_demo/widgets/n_ui.dart';
 
@@ -342,6 +344,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Trending Now'), findsOneWidget);
+  });
+
+  test('VideoCacheManager cleans video cache and trims image memory without throwing', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (MethodCall methodCall) async {
+        return '.';
+      },
+    );
+    expect(VideoCacheManager.instance.clearPlayerCache(), completes);
   });
 }
 

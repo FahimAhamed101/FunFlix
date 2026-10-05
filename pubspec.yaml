@@ -19,6 +19,7 @@ dependencies:
   video_player: ^2.8.6
   # Portal, username and password never touch SharedPreferences.
   flutter_secure_storage: ^9.2.2
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
