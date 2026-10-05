@@ -143,7 +143,7 @@ class _MainShellState extends State<MainShell> {
           else
             const SizedBox.shrink(),
           if (_visited.contains(3))
-            MyNetflixScreen(
+            MyFunFlixScreen(
               repository: widget.repository,
               demoMode: widget.demoMode,
               onSignOut: widget.onSignOut,
@@ -217,7 +217,7 @@ class _BottomBar extends StatelessWidget {
                 onTap: () => onSelect(2),
               ),
               _NavItem(
-                label: 'My Netflix',
+                label: 'My FunFlix',
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 active: index == 3,
@@ -248,7 +248,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // White rather than the brand red. Netflix keeps red for the wordmark and
+    // White rather than the brand red. FunFlix keeps red for the wordmark and
     // primary actions; a red bar reads as an error state.
     final colour = active ? AppColors.textPrimary : AppColors.textMuted;
 

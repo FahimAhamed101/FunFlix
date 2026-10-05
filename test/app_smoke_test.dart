@@ -228,7 +228,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark(),
-        home: MyNetflixScreen(
+        home: MyFunFlixScreen(
           repository: _OfflineRepository(),
           onSignOut: () async => signedOut = true,
         ),
@@ -290,7 +290,7 @@ void main() {
 
     expect(find.text('Trending Now'), findsOneWidget);
 
-    await tester.tap(find.text('My Netflix'));
+    await tester.tap(find.text('My FunFlix'));
     await settleAfterLoad(tester);
 
     expect(find.text('Sign out'), findsOneWidget);

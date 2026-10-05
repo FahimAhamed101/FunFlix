@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Shared Netflix-style building blocks.
+/// Shared FunFlix-style building blocks.
 ///
 /// Kept in one file so the visual language stays consistent: a screen should
 /// reach for these rather than re-deriving button padding or badge metrics.
 
-/// The wordmark. Netflix-style heavy condensed wordmark with tight tracking.
+/// The wordmark. FunFlix-style heavy condensed wordmark with tight tracking.
 class Wordmark extends StatelessWidget {
   const Wordmark({
     super.key,
@@ -152,7 +152,7 @@ class NPrimaryButton extends StatelessWidget {
   }
 }
 
-/// White "Play" button — Netflix inverts to white for playback.
+/// White "Play" button — FunFlix inverts to white for playback.
 class NPlayButton extends StatelessWidget {
   const NPlayButton({
     super.key,
@@ -322,7 +322,7 @@ class NPill extends StatelessWidget {
   }
 }
 
-/// "98% match" in Netflix green.
+/// "98% match" in FunFlix green.
 class NMatchText extends StatelessWidget {
   const NMatchText({super.key, required this.rating});
 
@@ -331,7 +331,7 @@ class NMatchText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Xtream ratings are 0-10; Netflix shows a match percentage. Mapping the
+    // Xtream ratings are 0-10; FunFlix shows a match percentage. Mapping the
     // rating across 5.5-9.5 keeps the useful range legible instead of
     // collapsing everything into 60-90%.
     final percent = ((rating - 5.5) / 4.0).clamp(0.0, 1.0) * 30 + 70;

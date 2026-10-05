@@ -102,7 +102,7 @@ class PosterFallback extends StatelessWidget {
 
 /// A portrait poster tile.
 ///
-/// Artwork, a small caption, and nothing else — Netflix's rails are deliberately
+/// Artwork, a small caption, and nothing else — FunFlix's rails are deliberately
 /// chrome-free so the artwork carries the row. The caption is kept anyway: a
 /// real portal's posters are frequently missing or wrong, and a row of
 /// monograms with no names under them is not usable.
@@ -208,7 +208,7 @@ class RankedTitleCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
-            // The numeral is drawn *behind* the poster's left edge on Netflix.
+            // The numeral is drawn *behind* the poster's left edge on FunFlix.
             // Faking that with a negative offset keeps the artwork readable
             // while still reading as a chart position.
             Padding(
@@ -300,7 +300,7 @@ class WideTitleCard extends StatelessWidget {
               ),
             ),
           ),
-          const Positioned(left: 7, top: 6, child: _NetflixN()),
+          const Positioned(left: 7, top: 6, child: _FunFlixF()),
           Positioned(
             left: 10,
             right: 10,
@@ -352,14 +352,14 @@ class WideTitleCard extends StatelessWidget {
     );
   }
 }
-/// The small red "N" Netflix stamps on the corner of its wide cards.
-class _NetflixN extends StatelessWidget {
-  const _NetflixN();
+/// The small red "F" FunFlix stamps on the corner of its wide cards.
+class _FunFlixF extends StatelessWidget {
+  const _FunFlixF();
 
   @override
   Widget build(BuildContext context) {
     return const Text(
-      'N',
+      'F',
       style: TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w900,

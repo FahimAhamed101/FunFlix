@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Netflix-style palette.
+/// FunFlix-style palette.
 ///
-/// Near-pure black rather than the usual dark grey: Netflix's look depends on
+/// Near-pure black rather than the usual dark grey: FunFlix's look depends on
 /// artwork floating on nothing, and any lift in the background flattens the
 /// posters. Everything else steps up from there in small increments so cards
 /// separate without needing borders.
@@ -35,7 +35,7 @@ class AppColors {
   /// Hairlines. Kept very low contrast on purpose.
   static const border = Color(0xFF2A2A2A);
 
-  /// Netflix's "98% match" green.
+  /// FunFlix's "98% match" green.
   static const match = Color(0xFF46D369);
 
   /// Scrims for text over artwork. Baked as ARGB rather than computed at

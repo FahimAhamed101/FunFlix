@@ -7,7 +7,7 @@ import 'n_ui.dart';
 
 /// The full-bleed featured panel at the top of the home feed.
 ///
-/// Netflix's hero is mostly artwork: a large still, a scrim heavy enough that
+/// FunFlix's hero is mostly artwork: a large still, a scrim heavy enough that
 /// white type always reads, and only three pieces of information — what it is,
 /// how well it is rated, and the one action worth taking. Everything else is
 /// one tap away.

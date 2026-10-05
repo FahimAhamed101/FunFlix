@@ -11,8 +11,8 @@ import 'home_screen.dart' show ProfileAvatar;
 /// Two jobs: show what the portal says about the subscription, and get the
 /// user out. The second one is why the sign-out control sits outside every
 /// loading and error branch — signing out must work when the network does not.
-class MyNetflixScreen extends StatefulWidget {
-  const MyNetflixScreen({
+class MyFunFlixScreen extends StatefulWidget {
+  const MyFunFlixScreen({
     super.key,
     required this.repository,
     required this.onSignOut,
@@ -28,10 +28,12 @@ class MyNetflixScreen extends StatefulWidget {
   final bool demoMode;
 
   @override
-  State<MyNetflixScreen> createState() => _MyNetflixScreenState();
+  State<MyFunFlixScreen> createState() => _MyFunFlixScreenState();
 }
 
-class _MyNetflixScreenState extends State<MyNetflixScreen> {
+typedef MyNetflixScreen = MyFunFlixScreen;
+
+class _MyFunFlixScreenState extends State<MyFunFlixScreen> {
   AccountSnapshot? _account;
   bool _loading = true;
   Object? _error;
@@ -84,7 +86,7 @@ class _MyNetflixScreenState extends State<MyNetflixScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
           children: <Widget>[
-            const Text('My Netflix', style: AppTheme.display),
+            const Text('My FunFlix', style: AppTheme.display),
             const SizedBox(height: 20),
 
             _ProfileCard(

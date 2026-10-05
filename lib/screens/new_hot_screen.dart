@@ -156,7 +156,7 @@ class _NewHotScreenState extends State<NewHotScreen> {
     }
   }
 
-  /// A single column of full-width landscape cards, the way Netflix presents
+  /// A single column of full-width landscape cards, the way FunFlix presents
   /// "Everyone's Watching".
   Widget _everyone() {
     final titles = trendingTitles(_all, limit: 12);

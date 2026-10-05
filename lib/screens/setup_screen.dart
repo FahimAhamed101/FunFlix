@@ -8,7 +8,7 @@ import '../data/xtream_config.dart';
 import '../theme/app_theme.dart';
 import '../widgets/n_ui.dart';
 
-/// The Netflix-style, high-fidelity sign-in screen for FunFlix.
+/// The FunFlix high-fidelity sign-in screen.
 ///
 /// Features modern glassmorphic surfaces, tactile micro-interactions,
 /// smart URL/credential auto-fill, quick protocol/port chips, connection testing,
